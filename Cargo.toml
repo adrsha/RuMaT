@@ -1,0 +1,11 @@
+[package]
+name = "rustCalc"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+colored = "2.1.0"
+homedir = "0.3.3"
+num-complex = "0.4.6"
+regex = "1.10.6"
+rustyline = "14.0.0"

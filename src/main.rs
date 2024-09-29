@@ -1,4 +1,4 @@
-//TODO: config, eqn, integration, derivative, plot, etc
+// TODO: config, eqn, integration, derivative, plot, etc
 use core::f64;
 use num_complex::Complex;
 use regex::Regex;
@@ -17,7 +17,8 @@ const FUNCS: [&str; 13] = [
     "cos", "sin", "tan", "sec", "cosec", "cot", "cosh", "sinh", "tanh", "sech", "cosech", "coth",
     "log",
 ];
-const OPERATORS: [&str; 9] = ["+", "-", "*", "/", "^", "!", "%", "C", "P"];
+// const OPERATORS: [&str; 9] = ["+", "-", "*", "/", "^", "!", "%", "C", "P"];
+const OPERATORS: [&str; 9] = ["P", "C", "%", "!", "^", "/", "*", "-", "+"];
 
 fn round_nums(n: f64) -> f64 {
     let mut m: f64 = n * 10_f64.powi(15);
@@ -42,9 +43,18 @@ fn format_out(op_vec: &mut Vec<Vec<String>>) {
         }
         // replacements
         out_buf = out_buf.replace("+ -", "-");
-        // trim end spaces
-        out_buf = out_buf.trim().to_string();
 
+        // trim end spaces
+        out_buf = out_buf.trim().to_string()
+            .replace("x2", "x²")
+            .replace("x3", "x³")
+            .replace("x4", "x⁴")
+            .replace("x5", "x⁵")
+            .replace("x6", "x⁶")
+            .replace("x7", "x⁷")
+            .replace("x8", "x⁸")
+            .replace("x9", "x⁹");
+       
         // remove duplicates
         let temp_out_buf = out_buf
             .clone()
@@ -73,6 +83,14 @@ fn format_out(op_vec: &mut Vec<Vec<String>>) {
 
         out_string_vec.push(out_buf);
     }
+
+    // To Get highlights for all operations and operators
+    for ind in 0..out_string_vec.len() {
+        for op in OPERATORS {
+            out_string_vec[ind] = out_string_vec[ind].replace(op, &format!(" {} ", op));
+        }
+    }
+
     out_string_vec.dedup();
     for step in out_string_vec {
         let mut out_buf = String::from(format!("{}", "= ".black()));
@@ -82,8 +100,10 @@ fn format_out(op_vec: &mut Vec<Vec<String>>) {
             } else if misc::is_string_lbrac(el.to_string()) || misc::is_string_rbrac(el.to_string())
             {
                 out_buf = out_buf + &format!("{}", el.red());
+            } else if misc::is_string_operator(el.to_string()) {
+                out_buf = out_buf + &format!(" {} ", el.green());
             } else {
-                out_buf = out_buf + &format!(" {} ", el.blue());
+                out_buf = out_buf + &format!("{}", el.blue());
             }
         }
 
@@ -159,7 +179,6 @@ fn simplify(
             r_ind = l_ind + inp_vec_mod.len() - 1;
         }
 
-        op_vec.push(new_inp_vec.clone());
     }
 
     // println!("bot new_inp_vec: {:?}", new_inp_vec);
@@ -297,8 +316,7 @@ fn operation_two_operands(oper_vec: Vec<Vec<String>>, op: char) -> Vec<String> {
     let mut i = 0;
     if temp_vec.len() > 1 {
         loop {
-            let mut res: String = String::from("");
-            println!("temp_vec: {:?}", temp_vec);
+            let res: String;
             if misc::is_string_numeric(temp_vec[i].clone())
                 && misc::is_string_numeric(temp_vec[i + 1].clone())
             {
@@ -360,16 +378,123 @@ fn operation_two_operands(oper_vec: Vec<Vec<String>>, op: char) -> Vec<String> {
                     };
                 }
                 temp_vec.remove(i + 1);
+            } else if temp_vec.len()>1 && (temp_vec[i].contains("x") || temp_vec[i+1].contains("x")) && !(misc::is_string_operator(temp_vec[i+1].clone())) && !(misc::is_string_operator(temp_vec[i].clone())) && !(misc::is_string_lbrac(temp_vec[i+1].clone())) && !(misc::is_string_rbrac(temp_vec[i+1].clone())) && !(misc::is_string_lbrac(temp_vec[i].clone())) && !(misc::is_string_rbrac(temp_vec[i].clone())) {
+                // x simplification
+                    let first_el = temp_vec[i].clone();
+                    let sec_el = temp_vec[i+1].clone();
+                    let re_poly = Regex::new(r"((0-9)*)?x((0-9)*)?").unwrap();
+                    let mut max_power:i32 = 0;
+
+                    res = match op {
+                        '*' => {
+                            let elements = vec![first_el.split("+").into_iter(), sec_el.split("+").into_iter()];
+                            let mut coef:Vec<Vec<f64>> = vec![vec![], vec![]];
+
+                            for i in 0..coef.len(){
+                                max_power = 0;
+                                for el in elements[i].clone(){
+                                    let coef_vals:Vec<&str>;
+                                    if re_poly.is_match(el){
+                                        let temp_el = &el.replace("x", " x ");
+                                        coef_vals = temp_el.split(" ").collect();
+                                        let diff = coef_vals[2].parse::<i32>().unwrap_or(1) - max_power;
+                                        if diff > 0 {
+                                            max_power = coef_vals[2].parse::<i32>().unwrap_or(1);
+                                            for _ in 0..=diff {
+                                                coef[i].push(0.0);
+                                            }
+                                        }
+                                        for j in 0..coef[i].len() {
+                                            if j == coef_vals[2].parse::<usize>().unwrap_or(1) {
+                                                coef[i][j] = coef_vals[0].parse::<f64>().unwrap_or(1.0);
+                                            }
+                                        }
+                                    } else{
+                                        if coef[i].len() == 0 {
+                                            coef[i].push(el.parse::<f64>().unwrap_or(0.0));
+                                        } else {
+                                            coef[i][0] = coef[i][0] + el.parse::<f64>().unwrap_or(0.0);
+                                        }
+                                    }
+                                }
+                            }
+                            let mut out_coef = vec![];
+                            for _ in 0..(coef[0].len()*coef[1].len()){
+                                out_coef.push(0.0);
+                            }
+                            for (f_i, f) in coef[0].clone().into_iter().enumerate(){
+                                for (s_i, s) in coef[1].clone().into_iter().enumerate(){
+                                        out_coef[f_i+s_i] = out_coef[f_i+s_i] + f*s;
+                                }
+                            }
+
+                            let mut output = "".to_string();
+                            for (o_i, o) in out_coef.iter().enumerate(){
+                                if *o != 0.0 {
+                                    if o_i == 0 {
+                                        output = output + &format!("{}+", o);
+                                        continue;
+                                    }
+                                    output = output + &format!("{}x{}+", o, if o_i == 1 {"".to_string()} else {o_i.to_string()});
+                                }
+                            }
+                            temp_vec.remove(i + 1);
+                            output[0..output.len()-1].to_string()
+                        },
+                        '+' => {
+                            let mut coef:Vec<f64> = vec![];
+                            let sum = first_el.clone() + "+" + &sec_el;
+
+                            let sum_el = sum.split("+").into_iter();
+                            for el in sum_el{
+                                let coef_vals:Vec<&str>;
+                                if re_poly.is_match(el){
+                                    let temp_el = &el.replace("x", " x ");
+                                    coef_vals = temp_el.split(" ").collect();
+                                    let diff = coef_vals[2].parse::<i32>().unwrap_or(1) - max_power;
+                                    if diff > 0 {
+                                        max_power = coef_vals[2].parse::<i32>().unwrap_or(1);
+                                        for _ in 0..=diff {
+                                            coef.push(0.0);
+                                        }
+                                    }
+                                    coef[coef_vals[2].parse::<usize>().unwrap_or(1)] = coef[coef_vals[2].parse::<usize>().unwrap_or(1)] + coef_vals[0].parse::<f64>().unwrap();
+                                } else{
+                                    if coef.len() == 0 {
+                                        coef.push(el.parse::<f64>().unwrap());
+                                    } else {
+                                        coef[0] = coef[0] + el.parse::<f64>().unwrap();
+                                    }
+                                }
+                            }
+                            let mut output_val = "".to_string();
+                            for (power, coefficient) in coef.iter().enumerate() {
+                                if coefficient != &0.0 {
+                                    if power == 0 {
+                                        output_val = output_val + &format!("{}+", coefficient);
+                                    }else{
+                                        output_val = output_val + &format!("{}x{}+", coefficient, if power == 1 {"".to_string()} else {power.to_string()});
+                                    }
+                                }
+                            }
+                            temp_vec.remove(i + 1);
+                            output_val[..output_val.len()-1].to_string()
+                        },
+                        _ => {
+                            i = i + 1;
+                            temp_vec[i].clone()
+                        },
+                    };
+                    // temp_vec.remove(i);
+
             } else {
-                // if temp_vec[i].contains("x") || temp_vec[i+1].contains("x") {
-                //
-                // }
+                res = temp_vec[i+1].clone();
                 i = i + 1;
             }
-
             temp_vec[i] = res;
             // println!("len:{},i:{}", temp_vec.len(), i);
             // println!("Temp_Vec: {:?}", temp_vec);
+            // println!("Operator: {:?}", op);
             if i >= temp_vec.len() - 1 {
                 break;
             }
@@ -381,10 +506,11 @@ fn trigonometry_cmplx(trig: &String, mut c: Complex<f64>, cur_modes: &Modes) -> 
     if !cur_modes.rad {
         c = c * f64::consts::PI / 180.0;
     }
-    // cos(a+bi)=cosacoshb−isinasinhb.
+    // INFO: cos(a+bi)=cosacoshb−isinasinhb.
     // sin(a+bi)=sinacoshb+icosasinhb.
     // cosh(a+bi)=coshacosb+isinhasinb.
     // sinh(a+bi)=sinhacosb+icoshasinb.
+
     let cos = Complex::new(
         round_nums(c.re.cos() * c.im.cosh()),
         round_nums(c.re.sin() * c.im.sinh()),
@@ -672,8 +798,8 @@ impl Alias {
                 let child = temp_self.unwrap(&temp_self.nodes[i], storage.clone());
                 storage.extend(
                     child
-                        .iter()
-                        .map(|c| (temp_self.alias.clone() + &c.0, c.1.clone())),
+                    .iter()
+                    .map(|c| (temp_self.alias.clone() + &c.0, c.1.clone())),
                 );
                 if temp_self.alias != "" {
                     storage.extend(vec![(temp_self.alias.clone(), temp_self.value.clone())]);
@@ -761,7 +887,7 @@ fn main() {
                 alias: "m".to_string(),
                 nodes: vec![],
             },
-        ],
+            ],
     };
     let mut vec_alias = cur_aliases.unwrap(&cur_aliases, vec![]);
     vec_alias.sort_by(|a, b| a.0.len().partial_cmp(&b.0.len()).unwrap());
@@ -956,8 +1082,9 @@ fn main() {
             // Operation
             inp_vec = simplify(inp_vec, l_ind, r_ind, &mut op_vec, &cur_modes);
 
+            op_vec.push(inp_vec.clone());
             // Get rid of the extra brackets around
-            // NOTE, dont rely on r_ind as it will be different from the true one at this point
+            // NOTE: dont rely on r_ind as it will be different from the true one at this point
             if brac_found == true {
                 let mut inp_vec_temp = inp_vec[..l_ind].to_vec();
                 inp_vec_temp.extend(vec![inp_vec[l_ind + 1].clone()]);

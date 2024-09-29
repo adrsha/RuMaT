@@ -1,5 +1,7 @@
+use crate::OPERATORS;
 use num_complex::Complex;
 use regex::Regex;
+
 const L_BRAC: [&str; 3] = ["(", "{", "["];
 const R_BRAC: [&str; 3] = [")", "}", "]"];
 
@@ -80,6 +82,15 @@ pub fn is_string_lbrac(str: String) -> bool {
 pub fn is_string_rbrac(str: String) -> bool {
     for i in 0..L_BRAC.len() {
         if str == R_BRAC[i] {
+            return true;
+        }
+    }
+    return false;
+}
+
+pub fn is_string_operator(str: String) -> bool {
+    for i in 0..OPERATORS.len() {
+        if str == OPERATORS[i] {
             return true;
         }
     }

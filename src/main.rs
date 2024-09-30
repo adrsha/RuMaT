@@ -1,5 +1,7 @@
 // TODO: config, eqn, integration, derivative, plot, etc
+
 use core::f64;
+use misc::{is_string_lbrac, is_string_rbrac};
 use num_complex::Complex;
 use regex::Regex;
 
@@ -34,7 +36,18 @@ fn format_out(op_vec: &mut Vec<Vec<String>>) {
     // Conversion to string
     for (ind, vec) in op_vec.iter().enumerate() {
         let mut out_buf = String::from("");
-        for el in vec.iter() {
+        for (el_i, el) in vec.iter().enumerate() {
+            let el_contains_op = el.contains("+") || el.contains("-") || el.contains("*") || el.contains("/") || el.contains("^") || el.contains("!") || el.contains("%") || el.contains("C") || el.contains("P");
+            if el_contains_op && el.contains("x") {
+                if el_i > 0 {
+                        if is_string_lbrac(vec[el_i-1].clone()) && is_string_rbrac(vec[el_i+1].clone()) {
+                            out_buf = out_buf + &format!("{}", el);
+                            continue;
+                        }
+                }
+                out_buf = out_buf + &format!("( {} )", el);
+                continue;
+            }
             out_buf = out_buf + &format!(" {} ", el);
         }
         // remove double spaces
@@ -80,7 +93,6 @@ fn format_out(op_vec: &mut Vec<Vec<String>>) {
                 continue;
             }
         }
-
         out_string_vec.push(out_buf);
     }
 
@@ -371,6 +383,7 @@ fn operation_two_operands(oper_vec: Vec<Vec<String>>, op: char) -> Vec<String> {
                         }
                         '^' => round_nums(first_el.powf(sec_el)).to_string(),
                         '/' => round_nums(first_el / sec_el).to_string(),
+                        '%' => round_nums(first_el % sec_el).to_string(),
                         '*' => round_nums(first_el * sec_el).to_string(),
                         '-' => round_nums(first_el - sec_el).to_string(),
                         '+' => round_nums(first_el + sec_el).to_string(),

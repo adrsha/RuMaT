@@ -132,6 +132,8 @@ fn format_out(op_vec: &mut Vec<Vec<String>>) {
                 out_buf = out_buf + &format!("{}", el.red());
             } else if misc::is_string_operator(el.to_string()) {
                 out_buf = out_buf + &format!(" {} ", el.green());
+            } else if el == "=" {
+                out_buf = out_buf + &format!(" {} ", el.magenta());
             } else {
                 out_buf = out_buf + &format!("{}", el.blue());
             }
@@ -280,6 +282,8 @@ fn format_inp(mut inp: String) -> String {
     inp = inp.replace(")", " ) ");
     // -- --
 
+    inp = inp.replace("=", " = ");
+
     // remove double spaces
     while inp.contains("  ") {
         inp = inp.replace("  ", " ");
@@ -344,7 +348,6 @@ fn operation_two_operands(oper_vec: Vec<Vec<String>>, op: char) -> Vec<String> {
     let mut i = 0;
     if temp_vec.len() > 1 {
         loop {
-            let mut post_mod = true;
             let res: String;
             if misc::is_string_numeric(temp_vec[i].clone())
                 && misc::is_string_numeric(temp_vec[i + 1].clone())
@@ -423,21 +426,8 @@ fn operation_two_operands(oper_vec: Vec<Vec<String>>, op: char) -> Vec<String> {
 
                 res = match op {
                     '^' => {
-                        if !misc::is_string_numeric(sec_el.to_string()) {
-                            println!("{}", "Cannot raise to the power of a non-integer".red());
-                            std::process::exit(0);
-                        }
                         temp_vec.remove(i + 1);
-                        temp_vec.remove(i);
-                        let mut j = i;
-                        for _ in 0..sec_el.trim().parse::<i32>().unwrap_or(1) {
-                            temp_vec.insert(j, first_el.clone());
-                            temp_vec.insert(j + 1, "*".to_string());
-                            j = j + 2;
-                        }
-                        temp_vec.remove(j - 1);
-                        post_mod = false;
-                        String::from("")
+                        poly_power(first_el, sec_el)
                     }
                     '/' => {
                         temp_vec.remove(i + 1);
@@ -462,15 +452,25 @@ fn operation_two_operands(oper_vec: Vec<Vec<String>>, op: char) -> Vec<String> {
                 res = temp_vec[i + 1].clone();
                 i = i + 1;
             }
-            if post_mod {
-                temp_vec[i] = res;
-                if i >= temp_vec.len() - 1 {
-                    break;
-                }
+            temp_vec[i] = res;
+            if i >= temp_vec.len() - 1 {
+                break;
             }
         }
     }
     return temp_vec;
+}
+
+fn poly_power(first_el: String, sec_el: String) -> String {
+    if !misc::is_string_numeric(sec_el.to_string()) {
+        println!("{}", "Cannot raise to the power of a non-integer".red());
+        std::process::exit(0);
+    }
+    let mut temp_el = first_el.clone();
+    for _ in 0..sec_el.trim().parse::<i32>().unwrap_or(1) - 1 {
+        temp_el = poly_multiplication(temp_el.clone(), first_el.clone());
+    }
+    temp_el
 }
 
 fn poly_division(first_el: String, sec_el: String) -> String {
@@ -1100,8 +1100,7 @@ fn main() {
     history_path.push(".history.txt");
     let history_path = history_path.into_os_string().into_string().unwrap();
     'fullblock: loop {
-        let mut op_vec: Vec<Vec<String>> = vec![];
-        let mut inp;
+        let mut input;
         let mut rl = DefaultEditor::new().expect("Readline Issues");
         if let Err(_) = rl.load_history(&history_path) {
             println!("No past history.");
@@ -1112,7 +1111,7 @@ fn main() {
             Ok(line) => {
                 rl.add_history_entry(line.as_str())
                     .expect("No history found");
-                inp = line;
+                input = line;
             }
             Err(ReadlineError::Interrupted) => {
                 println!("Exiting");
@@ -1130,7 +1129,7 @@ fn main() {
         rl.save_history(&history_path)
             .expect("Could not store in history.txt");
 
-        if inp == "h".to_string() || inp == "help".to_string() {
+        if input == "h".to_string() || input == "help".to_string() {
             let title = "SHARK:".blue();
 
             let help_page = "HELP PAGE (h)".green();
@@ -1151,11 +1150,11 @@ fn main() {
 
             println!("{}\n\n{}\n\n{}", title, help_page, formatted_features);
             continue;
-        } else if inp == "".to_string() {
+        } else if input == "".to_string() {
             continue;
-        } else if inp == "q".to_string() {
+        } else if input == "q".to_string() {
             std::process::exit(0);
-        } else if inp == "aliases".to_string() {
+        } else if input == "aliases".to_string() {
             let title = "ALIASES".blue();
 
             let mut aliases = vec_alias.clone();
@@ -1166,7 +1165,7 @@ fn main() {
                 .collect();
             println!("{}\n\n{}", title, formatted_features);
             continue;
-        } else if inp == "modes" {
+        } else if input == "modes" {
             let mut close_modes = false;
             while !close_modes {
                 let mode_inp: String;
@@ -1229,77 +1228,113 @@ fn main() {
         //-- --
         if cur_modes.alias {
             for i in vec_alias.iter().rev() {
-                inp = inp.replace(&i.0, &i.1.to_string());
+                input = input.replace(&i.0, &i.1.to_string());
             }
             println!("{}", "Aliasing is on!".green());
         }
         //-- --
+        let mut op_vec: Vec<Vec<Vec<String>>> = vec![vec![]];
 
         // Separate each exps in input in a vector
-        // -- --
-        inp = format_inp(inp);
-        //-- --
+        for (inp_ind, mut inp) in input.split('=').map(|s| s.to_string()).enumerate() {
+            inp = format_inp(inp);
 
-        let mut inp_vec = misc::create_vecs_from_str(inp, " ");
-        // println!("@main inp_vec{:?}", inp_vec);
-        // -- --
-        let mut output_obtained = false;
-
-        while !output_obtained {
-            // Brackets Autocomplete
+            let mut inp_vec = misc::create_vecs_from_str(inp, " ");
+            // println!("@main inp_vec{:?}", inp_vec);
             // -- --
-            let mut brac_found: bool = false;
-            let mut missed_bracs = 0;
-            let mut inp_vec_prev: Vec<String> = vec![];
-            while inp_vec_prev != inp_vec {
-                inp_vec_prev = inp_vec.clone();
-                (inp_vec, missed_bracs) = unequal_brac(inp_vec, missed_bracs);
-            }
+            let mut output_obtained = false;
 
-            if missed_bracs > 0 {
-                println!(
-                    "{} {}",
-                    "⚠︎ Warning!".yellow(),
-                    "Brackets were not all matched.",
-                )
-            }
-            // -- --
-            let mut l_ind = 0;
-            let mut r_ind = inp_vec.len() - 1;
+            while !output_obtained {
+                // Brackets Autocomplete
+                // -- --
+                let mut brac_found: bool = false;
+                let mut missed_bracs = 0;
+                let mut inp_vec_prev: Vec<String> = vec![];
+                while inp_vec_prev != inp_vec {
+                    inp_vec_prev = inp_vec.clone();
+                    (inp_vec, missed_bracs) = unequal_brac(inp_vec, missed_bracs);
+                }
 
-            // In Brackets Crop
-            // -- --
-            for (ind, c) in inp_vec.iter().enumerate() {
-                if misc::is_string_lbrac((*c).clone()) {
-                    l_ind = ind;
-                } else if misc::is_string_rbrac((*c).clone()) {
-                    r_ind = ind;
-                    brac_found = true;
-                    break;
+                if missed_bracs > 0 {
+                    println!(
+                        "{} {}",
+                        "⚠︎ Warning!".yellow(),
+                        "Brackets were not all matched.",
+                    )
+                }
+
+                let mut l_ind = 0;
+                let mut r_ind = inp_vec.len() - 1;
+
+                // In Brackets Crop
+
+                for (ind, c) in inp_vec.iter().enumerate() {
+                    if misc::is_string_lbrac((*c).clone()) {
+                        l_ind = ind;
+                    } else if misc::is_string_rbrac((*c).clone()) {
+                        r_ind = ind;
+                        brac_found = true;
+                        break;
+                    }
+                }
+
+                // Get output vector ready
+                //
+                while op_vec.len() < inp_ind + 1 {
+                    op_vec.push(vec![]);
+                }
+
+                // Operation
+                inp_vec = simplify(inp_vec, l_ind, r_ind, &mut op_vec[inp_ind], &cur_modes);
+
+                op_vec[inp_ind].push(inp_vec.clone());
+
+                // Get rid of the extra brackets around
+                // NOTE: dont rely on r_ind as it will be different from the true one at this point
+                if brac_found == true {
+                    let mut inp_vec_temp = inp_vec[..l_ind].to_vec();
+                    inp_vec_temp.extend(vec![inp_vec[l_ind + 1].clone()]);
+                    inp_vec_temp.extend(inp_vec[l_ind + 3..].to_vec());
+                    inp_vec = inp_vec_temp;
+                    op_vec[inp_ind].push(inp_vec.clone());
+                }
+
+                // break;
+                // println!("@main while inp_vec{:?}", inp_vec);
+
+                if inp_vec.len() <= 1 {
+                    output_obtained = true;
                 }
             }
-            // -- --
-            // Operation
-            inp_vec = simplify(inp_vec, l_ind, r_ind, &mut op_vec, &cur_modes);
+        }
 
-            op_vec.push(inp_vec.clone());
-            // Get rid of the extra brackets around
-            // NOTE: dont rely on r_ind as it will be different from the true one at this point
-            if brac_found == true {
-                let mut inp_vec_temp = inp_vec[..l_ind].to_vec();
-                inp_vec_temp.extend(vec![inp_vec[l_ind + 1].clone()]);
-                inp_vec_temp.extend(inp_vec[l_ind + 3..].to_vec());
-                inp_vec = inp_vec_temp;
-                op_vec.push(inp_vec.clone());
-            }
-            // break;
-            // println!("@main while inp_vec{:?}", inp_vec);
-
-            if inp_vec.len() <= 1 {
-                output_obtained = true;
+        let mut max_len = 0;
+        let mut max_len_ind = 0;
+        let no_of_hands = op_vec.len();
+        for (op_ind, _) in op_vec.clone().into_iter().enumerate() {
+            if max_len < op_vec[op_ind].len() {
+                max_len = op_vec[op_ind].len();
+                max_len_ind = op_ind;
             }
         }
-        format_out(&mut op_vec);
+        for l in 0..no_of_hands {
+            for _ in op_vec[l].len()..max_len {
+                let last_el = op_vec[l][op_vec[l].len() - 1].clone();
+                op_vec[l].push(last_el);
+            }
+        }
+
+        let mut temp_op_vec = op_vec[max_len_ind].clone();
+        for hand in 0..no_of_hands {
+            if hand != max_len_ind {
+                for k in 0..op_vec[hand].len() {
+                    let mut temp_op_val = op_vec[hand][k].clone();
+                    temp_op_val.insert(0, " = ".to_string());
+                    temp_op_vec[k].extend(temp_op_val);
+                }
+            }
+        }
+        format_out(&mut temp_op_vec);
         // -- --
     }
     // -- --

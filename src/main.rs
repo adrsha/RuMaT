@@ -162,7 +162,6 @@ fn neg_fixer(new_inp_vec: Vec<String>) -> Vec<String> {
         }
     }
     return inp_vec_temp;
-    // -- --
 }
 
 fn simplify(
@@ -345,6 +344,7 @@ fn operation_two_operands(oper_vec: Vec<Vec<String>>, op: char) -> Vec<String> {
     let mut i = 0;
     if temp_vec.len() > 1 {
         loop {
+            let mut post_mod = true;
             let res: String;
             if misc::is_string_numeric(temp_vec[i].clone())
                 && misc::is_string_numeric(temp_vec[i + 1].clone())
@@ -420,224 +420,253 @@ fn operation_two_operands(oper_vec: Vec<Vec<String>>, op: char) -> Vec<String> {
                 // x simplification
                 let first_el = temp_vec[i].clone();
                 let sec_el = temp_vec[i + 1].clone();
-                let re_poly = Regex::new(r"((0-9)*)?x((0-9)*)?").unwrap();
-                let mut max_power: i32 = 0;
 
                 res = match op {
-                    '/' => {
-                        let elements = vec![
-                            first_el.split("+").into_iter(),
-                            sec_el.split("+").into_iter(),
-                        ];
-                        let mut coef: Vec<Vec<f64>> = create_coefs(elements);
-                        let mut log_coef: Vec<f64> = vec![];
-                        let mut log_deg: Vec<f64> = vec![];
-
-                        let mut p_coef;
-                        let mut p_deg = coef[0].len() as i32 - coef[1].len() as i32;
-
-                        while p_deg > 0 {
-                            p_coef = coef[0][coef[0].len() - 1] / coef[1][coef[1].len() - 1];
-                            p_deg = coef[0].len() as i32 - coef[1].len() as i32;
-
-                            log_coef.push(p_coef);
-                            log_deg.push(p_deg as f64);
-
-                            // Multiply by reqd coef
-                            for ind in 0..coef[1].len() {
-                                coef[1][ind] = coef[1][ind] * p_coef;
-                            }
-
-                            // Multiply by x that many times
-                            for _ in 0..p_deg {
-                                coef[1].insert(0, 0.0);
-                            }
-
-                            // Subtract
-                            for ind in 0..coef[1].len() {
-                                coef[0][ind] = coef[0][ind] - coef[1][ind];
-                            }
-                            let mut new_coef = coef[0].clone();
-
-                            while new_coef[new_coef.len() - 1] == 0.0 {
-                                let v = new_coef.len() - 1;
-                                new_coef.remove(v);
-                                if new_coef.len() == 0 {
-                                    break;
-                                }
-                            }
-                            coef[0] = new_coef;
-
-                            // Revert the coef[1] to the original
-
-                            for _ in 0..p_deg {
-                                coef[1].remove(0);
-                            }
+                    '^' => {
+                        if !misc::is_string_numeric(sec_el.to_string()) {
+                            println!("{}", "Cannot raise to the power of a non-integer".red());
+                            std::process::exit(0);
                         }
-                        let mut output = String::from("");
-                        for ind in 0..log_deg.len() {
-                            if log_deg[ind] == 0.0 {
-                                output = output + &format!("{}+", log_coef[ind]);
-                            } else {
-                                output = output
-                                    + &format!(
-                                        "{}x{}+",
-                                        if log_coef[ind] == 1.0 {
-                                            "".to_string()
-                                        } else {
-                                            log_coef[ind].to_string()
-                                        },
-                                        if log_deg[ind] == 1.0 {
-                                            "".to_string()
-                                        } else {
-                                            log_deg[ind].to_string()
-                                        }
-                                    );
-                            }
-                        }
-                        output = output + "(";
-                        for ind in 0..coef[0].len() {
-                            if ind == 0 {
-                                output = output + &format!("{}+", coef[0][ind]);
-                            } else {
-                                output = output
-                                    + &format!(
-                                        "{}x{}+",
-                                        if coef[0][ind] == 1.0 {
-                                            "".to_string()
-                                        } else {
-                                            coef[0][ind].to_string()
-                                        },
-                                        if ind == 1 {
-                                            "".to_string()
-                                        } else {
-                                            ind.to_string()
-                                        }
-                                    );
-                            }
-                        }
-
                         temp_vec.remove(i + 1);
-                        output = output[0..output.len() - 1].to_string();
-                        (output + ")/(" + &sec_el + ")").to_string()
+                        temp_vec.remove(i);
+                        let mut j = i;
+                        for _ in 0..sec_el.trim().parse::<i32>().unwrap_or(1) {
+                            temp_vec.insert(j, first_el.clone());
+                            temp_vec.insert(j + 1, "*".to_string());
+                            j = j + 2;
+                        }
+                        temp_vec.remove(j - 1);
+                        post_mod = false;
+                        String::from("")
+                    }
+                    '/' => {
+                        temp_vec.remove(i + 1);
+                        poly_division(first_el, sec_el)
                     }
                     '*' => {
-                        let elements = vec![
-                            first_el.split("+").into_iter(),
-                            sec_el.split("+").into_iter(),
-                        ];
-                        let coef: Vec<Vec<f64>> = create_coefs(elements);
-                        let mut out_coef = vec![];
-                        for _ in 0..(coef[0].len() * coef[1].len()) {
-                            out_coef.push(0.0);
-                        }
-                        for (f_i, f) in coef[0].clone().into_iter().enumerate() {
-                            for (s_i, s) in coef[1].clone().into_iter().enumerate() {
-                                out_coef[f_i + s_i] = out_coef[f_i + s_i] + f * s;
-                            }
-                        }
-
-                        let mut output = "".to_string();
-                        for (o_i, o) in out_coef.iter().enumerate() {
-                            if *o != 0.0 {
-                                if o_i == 0 {
-                                    output = output + &format!("{}+", o);
-                                } else {
-                                    output = output
-                                        + &format!(
-                                            "{}x{}+",
-                                            if *o == 1.0 {
-                                                "".to_string()
-                                            } else {
-                                                o.to_string()
-                                            },
-                                            if o_i == 1 {
-                                                "".to_string()
-                                            } else {
-                                                o_i.to_string()
-                                            }
-                                        );
-                                }
-                            }
-                        }
                         temp_vec.remove(i + 1);
-                        output[0..output.len() - 1].to_string()
+                        poly_multiplication(first_el, sec_el)
                     }
                     '+' => {
-                        let mut coef: Vec<f64> = vec![];
-                        let sum = first_el.clone() + "+" + &sec_el;
-
-                        let sum_el = sum.split("+").into_iter();
-                        for el in sum_el {
-                            let coef_vals: Vec<&str>;
-                            if re_poly.is_match(el) {
-                                let temp_el = &el.replace("x", " x ");
-                                coef_vals = temp_el.split(" ").collect();
-                                let diff = coef_vals[2].parse::<i32>().unwrap_or(1) - max_power;
-                                if diff > 0 {
-                                    max_power = coef_vals[2].parse::<i32>().unwrap_or(1);
-                                    for _ in 0..=diff {
-                                        coef.push(0.0);
-                                    }
-                                }
-                                coef[coef_vals[2].parse::<usize>().unwrap_or(1)] = coef
-                                    [coef_vals[2].parse::<usize>().unwrap_or(1)]
-                                    + coef_vals[0].parse::<f64>().unwrap_or(1.0);
-                            } else {
-                                if coef.len() == 0 {
-                                    coef.push(el.parse::<f64>().unwrap());
-                                } else {
-                                    coef[0] = coef[0] + el.parse::<f64>().unwrap();
-                                }
-                            }
-                        }
-                        let mut output_val = "".to_string();
-                        for (power, coefficient) in coef.iter().enumerate() {
-                            if coefficient != &0.0 {
-                                if power == 0 {
-                                    output_val = output_val + &format!("{}+", coefficient);
-                                } else {
-                                    output_val = output_val
-                                        + &format!(
-                                            "{}x{}+",
-                                            if *coefficient == 1.0 {
-                                                "".to_string()
-                                            } else {
-                                                coefficient.to_string()
-                                            },
-                                            if power == 1 {
-                                                "".to_string()
-                                            } else {
-                                                power.to_string()
-                                            }
-                                        );
-                                }
-                            }
-                        }
                         temp_vec.remove(i + 1);
-                        output_val[..output_val.len() - 1].to_string()
+                        poly_addition(first_el, sec_el)
                     }
                     _ => {
                         i = i + 1;
                         temp_vec[i].clone()
                     }
                 };
+
                 // temp_vec.remove(i);
             } else {
                 res = temp_vec[i + 1].clone();
                 i = i + 1;
             }
-            temp_vec[i] = res;
-            // println!("len:{},i:{}", temp_vec.len(), i);
-            // println!("Temp_Vec: {:?}", temp_vec);
-            // println!("Operator: {:?}", op);
-            if i >= temp_vec.len() - 1 {
-                break;
+            if post_mod {
+                temp_vec[i] = res;
+                if i >= temp_vec.len() - 1 {
+                    break;
+                }
             }
         }
     }
     return temp_vec;
 }
+
+fn poly_division(first_el: String, sec_el: String) -> String {
+    let elements = vec![
+        first_el.split("+").into_iter(),
+        sec_el.split("+").into_iter(),
+    ];
+    let mut coef: Vec<Vec<f64>> = create_coefs(elements);
+    let mut log_coef: Vec<f64> = vec![];
+    let mut log_deg: Vec<f64> = vec![];
+
+    let mut p_coef;
+    let mut p_deg = coef[0].len() as i32 - coef[1].len() as i32;
+
+    while p_deg > 0 {
+        p_coef = coef[0][coef[0].len() - 1] / coef[1][coef[1].len() - 1];
+        p_deg = coef[0].len() as i32 - coef[1].len() as i32;
+
+        log_coef.push(p_coef);
+        log_deg.push(p_deg as f64);
+
+        // Multiply by reqd coef
+        for ind in 0..coef[1].len() {
+            coef[1][ind] = coef[1][ind] * p_coef;
+        }
+
+        // Multiply by x that many times
+        for _ in 0..p_deg {
+            coef[1].insert(0, 0.0);
+        }
+
+        // Subtract
+        for ind in 0..coef[1].len() {
+            coef[0][ind] = coef[0][ind] - coef[1][ind];
+        }
+        let mut new_coef = coef[0].clone();
+
+        while new_coef[new_coef.len() - 1] == 0.0 {
+            let v = new_coef.len() - 1;
+            new_coef.remove(v);
+            if new_coef.len() == 0 {
+                break;
+            }
+        }
+        coef[0] = new_coef;
+
+        // Revert the coef[1] to the original
+
+        for _ in 0..p_deg {
+            coef[1].remove(0);
+        }
+    }
+    let mut output = String::from("");
+    for ind in 0..log_deg.len() {
+        if log_deg[ind] == 0.0 {
+            output = output + &format!("{}+", log_coef[ind]);
+        } else {
+            output = output
+                + &format!(
+                    "{}x{}+",
+                    if log_coef[ind] == 1.0 {
+                        "".to_string()
+                    } else {
+                        log_coef[ind].to_string()
+                    },
+                    if log_deg[ind] == 1.0 {
+                        "".to_string()
+                    } else {
+                        log_deg[ind].to_string()
+                    }
+                );
+        }
+    }
+    output = output + "(";
+    for ind in 0..coef[0].len() {
+        if ind == 0 {
+            output = output + &format!("{}+", coef[0][ind]);
+        } else {
+            output = output
+                + &format!(
+                    "{}x{}+",
+                    if coef[0][ind] == 1.0 {
+                        "".to_string()
+                    } else {
+                        coef[0][ind].to_string()
+                    },
+                    if ind == 1 {
+                        "".to_string()
+                    } else {
+                        ind.to_string()
+                    }
+                );
+        }
+    }
+    output = output[0..output.len() - 1].to_string();
+    (output + ")/(" + &sec_el + ")").to_string()
+}
+
+fn poly_addition(first_el: String, sec_el: String) -> String {
+    let mut coef: Vec<f64> = vec![];
+    let sum = first_el.clone() + "+" + &sec_el;
+    let re_poly = Regex::new(r"((0-9)*)?x((0-9)*)?").unwrap();
+    let mut max_power: i32 = 0;
+
+    let sum_el = sum.split("+").into_iter();
+    for el in sum_el {
+        let coef_vals: Vec<&str>;
+        if re_poly.is_match(el) {
+            let temp_el = &el.replace("x", " x ");
+            coef_vals = temp_el.split(" ").collect();
+            let diff = coef_vals[2].parse::<i32>().unwrap_or(1) - max_power;
+            if diff > 0 {
+                max_power = coef_vals[2].parse::<i32>().unwrap_or(1);
+                for _ in 0..=diff {
+                    coef.push(0.0);
+                }
+            }
+            coef[coef_vals[2].parse::<usize>().unwrap_or(1)] = coef
+                [coef_vals[2].parse::<usize>().unwrap_or(1)]
+                + coef_vals[0].parse::<f64>().unwrap_or(1.0);
+        } else {
+            if coef.len() == 0 {
+                coef.push(el.parse::<f64>().unwrap());
+            } else {
+                coef[0] = coef[0] + el.parse::<f64>().unwrap();
+            }
+        }
+    }
+    let mut output_val = "".to_string();
+    for (power, coefficient) in coef.iter().enumerate() {
+        if coefficient != &0.0 {
+            if power == 0 {
+                output_val = output_val + &format!("{}+", coefficient);
+            } else {
+                output_val = output_val
+                    + &format!(
+                        "{}x{}+",
+                        if *coefficient == 1.0 {
+                            "".to_string()
+                        } else {
+                            coefficient.to_string()
+                        },
+                        if power == 1 {
+                            "".to_string()
+                        } else {
+                            power.to_string()
+                        }
+                    );
+            }
+        }
+    }
+    output_val[..output_val.len() - 1].to_string()
+}
+
+fn poly_multiplication(first_el: String, sec_el: String) -> String {
+    let elements = vec![
+        first_el.split("+").into_iter(),
+        sec_el.split("+").into_iter(),
+    ];
+    let coef: Vec<Vec<f64>> = create_coefs(elements);
+    let mut out_coef = vec![];
+    for _ in 0..(coef[0].len() * coef[1].len()) {
+        out_coef.push(0.0);
+    }
+    for (f_i, f) in coef[0].clone().into_iter().enumerate() {
+        for (s_i, s) in coef[1].clone().into_iter().enumerate() {
+            out_coef[f_i + s_i] = out_coef[f_i + s_i] + f * s;
+        }
+    }
+
+    let mut output = "".to_string();
+    for (o_i, o) in out_coef.iter().enumerate() {
+        if *o != 0.0 {
+            if o_i == 0 {
+                output = output + &format!("{}+", o);
+            } else {
+                output = output
+                    + &format!(
+                        "{}x{}+",
+                        if *o == 1.0 {
+                            "".to_string()
+                        } else {
+                            o.to_string()
+                        },
+                        if o_i == 1 {
+                            "".to_string()
+                        } else {
+                            o_i.to_string()
+                        }
+                    );
+            }
+        }
+    }
+    output[0..output.len() - 1].to_string()
+}
+
 fn trigonometry_cmplx(trig: &String, mut c: Complex<f64>, cur_modes: &Modes) -> Complex<f64> {
     if !cur_modes.rad {
         c = c * f64::consts::PI / 180.0;

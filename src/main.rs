@@ -66,6 +66,7 @@ fn format_out(op_vec: &mut Vec<Vec<String>>) {
         }
         // replacements
         out_buf = out_buf.replace("+ -", "-");
+        out_buf = out_buf.replace("+-", "-");
 
         // trim end spaces
         out_buf = out_buf
@@ -217,6 +218,7 @@ fn simplify(
 
 fn format_inp(mut inp: String) -> String {
     inp = inp.replace(" ", "").replace("\n", "");
+    inp = inp.replace("+-", "-");
     // add multiplication in between number <x> combo
     // -- --
     for num in 0..=9 {
@@ -323,6 +325,7 @@ fn unequal_brac(inp_vec: Vec<String>, mut missed_bracs: i32) -> (Vec<String>, i3
                 }
             } else {
                 new_inp_vec.insert(0, misc::give_lbrac_from_rbrac(ch.clone()));
+                missed_bracs = missed_bracs + 1;
             }
         }
     }
@@ -485,9 +488,8 @@ fn poly_division(first_el: String, sec_el: String) -> String {
     let mut p_coef;
     let mut p_deg = coef[0].len() as i32 - coef[1].len() as i32;
 
-    while p_deg > 0 {
+    while p_deg >= 0 {
         p_coef = coef[0][coef[0].len() - 1] / coef[1][coef[1].len() - 1];
-        p_deg = coef[0].len() as i32 - coef[1].len() as i32;
 
         log_coef.push(p_coef);
         log_deg.push(p_deg as f64);
@@ -518,11 +520,16 @@ fn poly_division(first_el: String, sec_el: String) -> String {
         coef[0] = new_coef;
 
         // Revert the coef[1] to the original
-
         for _ in 0..p_deg {
             coef[1].remove(0);
         }
+        for ind in 0..coef[1].len() {
+            coef[1][ind] = round_nums(coef[1][ind] / p_coef);
+        }
+
+        p_deg = coef[0].len() as i32 - coef[1].len() as i32;
     }
+
     let mut output = String::from("");
     for ind in 0..log_deg.len() {
         if log_deg[ind] == 0.0 {
@@ -544,29 +551,36 @@ fn poly_division(first_el: String, sec_el: String) -> String {
                 );
         }
     }
-    output = output + "(";
-    for ind in 0..coef[0].len() {
-        if ind == 0 {
-            output = output + &format!("{}+", coef[0][ind]);
-        } else {
-            output = output
-                + &format!(
-                    "{}x{}+",
-                    if coef[0][ind] == 1.0 {
-                        "".to_string()
-                    } else {
-                        coef[0][ind].to_string()
-                    },
-                    if ind == 1 {
-                        "".to_string()
-                    } else {
-                        ind.to_string()
-                    }
-                );
+    if coef[0].len() != 0 {
+        output = output + "(";
+        for ind in 0..coef[0].len() {
+            if coef[0][ind] == 0.0 {
+                continue;
+            }
+            if ind == 0 {
+                output = output + &format!("{}+", coef[0][ind]);
+            } else {
+                output = output
+                    + &format!(
+                        "{}x{}+",
+                        if coef[0][ind] == 1.0 {
+                            "".to_string()
+                        } else {
+                            coef[0][ind].to_string()
+                        },
+                        if ind == 1 {
+                            "".to_string()
+                        } else {
+                            ind.to_string()
+                        }
+                    );
+            }
         }
+        output = output[0..output.len() - 1].to_string();
+        (output + ")/(" + &sec_el + ")").to_string()
+    } else {
+        output[0..output.len() - 1].to_string()
     }
-    output = output[0..output.len() - 1].to_string();
-    (output + ")/(" + &sec_el + ")").to_string()
 }
 
 fn poly_addition(first_el: String, sec_el: String) -> String {
@@ -575,32 +589,40 @@ fn poly_addition(first_el: String, sec_el: String) -> String {
     let re_poly = Regex::new(r"((0-9)*)?x((0-9)*)?").unwrap();
     let mut max_power: i32 = 0;
 
-    let sum_el = sum.split("+").into_iter();
+    let sum_el = sum
+        .split("+")
+        .map(|s| s.to_string())
+        .collect::<Vec<String>>();
     for el in sum_el {
-        let coef_vals: Vec<&str>;
-        if re_poly.is_match(el) {
-            let temp_el = &el.replace("x", " x ");
-            coef_vals = temp_el.split(" ").collect();
-            let diff = coef_vals[2].parse::<i32>().unwrap_or(1) - max_power;
-            if diff > 0 {
-                max_power = coef_vals[2].parse::<i32>().unwrap_or(1);
-                for _ in 0..=diff {
-                    coef.push(0.0);
+        let f_el = format_inp(el.clone());
+        let f_el_vec = misc::create_vecs_from_str(f_el, " ");
+
+        if unequal_brac(f_el_vec, 0).1 == 0 {
+            let coef_vals: Vec<&str>;
+            if re_poly.is_match(&el) {
+                let temp_el = &el.replace("x", " x ");
+                coef_vals = temp_el.split(" ").collect();
+                let diff = coef_vals[2].parse::<i32>().unwrap_or(1) - max_power;
+                if diff > 0 {
+                    max_power = coef_vals[2].parse::<i32>().unwrap_or(1);
+                    for _ in 0..=diff {
+                        coef.push(0.0);
+                    }
                 }
-            }
-            coef[coef_vals[2].parse::<usize>().unwrap_or(1)] = coef
-                [coef_vals[2].parse::<usize>().unwrap_or(1)]
-                + coef_vals[0].parse::<f64>().unwrap_or(1.0);
-        } else {
-            if coef.len() == 0 {
-                coef.push(el.parse::<f64>().unwrap());
+                coef[coef_vals[2].parse::<usize>().unwrap_or(1)] = coef
+                    [coef_vals[2].parse::<usize>().unwrap_or(1)]
+                    + coef_vals[0].parse::<f64>().unwrap_or(1.0);
             } else {
-                coef[0] = coef[0] + el.parse::<f64>().unwrap();
+                if coef.len() == 0 {
+                    coef.push(el.parse::<f64>().unwrap());
+                } else {
+                    coef[0] = round_nums(coef[0] + el.parse::<f64>().unwrap());
+                }
             }
         }
     }
     let mut output_val = "".to_string();
-    for (power, coefficient) in coef.iter().enumerate() {
+    for (power, coefficient) in coef.iter().enumerate().rev() {
         if coefficient != &0.0 {
             if power == 0 {
                 output_val = output_val + &format!("{}+", coefficient);
@@ -622,7 +644,11 @@ fn poly_addition(first_el: String, sec_el: String) -> String {
             }
         }
     }
-    output_val[..output_val.len() - 1].to_string()
+    if output_val == "" {
+        return "0".to_string();
+    } else {
+        return output_val[..output_val.len() - 1].to_string();
+    }
 }
 
 fn poly_multiplication(first_el: String, sec_el: String) -> String {
@@ -637,12 +663,12 @@ fn poly_multiplication(first_el: String, sec_el: String) -> String {
     }
     for (f_i, f) in coef[0].clone().into_iter().enumerate() {
         for (s_i, s) in coef[1].clone().into_iter().enumerate() {
-            out_coef[f_i + s_i] = out_coef[f_i + s_i] + f * s;
+            out_coef[f_i + s_i] = out_coef[f_i + s_i] + round_nums(f * s);
         }
     }
 
     let mut output = "".to_string();
-    for (o_i, o) in out_coef.iter().enumerate() {
+    for (o_i, o) in out_coef.iter().enumerate().rev() {
         if *o != 0.0 {
             if o_i == 0 {
                 output = output + &format!("{}+", o);
@@ -664,7 +690,7 @@ fn poly_multiplication(first_el: String, sec_el: String) -> String {
             }
         }
     }
-    output[0..output.len() - 1].to_string()
+    output[0..(output.len() - 1)].to_string()
 }
 
 fn trigonometry_cmplx(trig: &String, mut c: Complex<f64>, cur_modes: &Modes) -> Complex<f64> {
@@ -939,6 +965,74 @@ fn functions(oper_vec: Vec<String>, cur_modes: &Modes) -> Vec<String> {
     return temp_vec;
 }
 
+fn brac_handler(mut inp: String, cur_modes: &Modes) -> Vec<Vec<String>> {
+    inp = format_inp(inp);
+
+    let mut inp_vec = misc::create_vecs_from_str(inp, " ");
+    // println!("@main inp_vec{:?}", inp_vec);
+    // -- --
+    let mut op_vec: Vec<Vec<String>> = vec![vec![]];
+    let mut output_obtained = false;
+
+    while !output_obtained {
+        // Brackets Autocomplete
+        // -- --
+        let mut brac_found: bool = false;
+        let mut missed_bracs = 0;
+        let mut inp_vec_prev: Vec<String> = vec![];
+        while inp_vec_prev != inp_vec {
+            inp_vec_prev = inp_vec.clone();
+            (inp_vec, missed_bracs) = unequal_brac(inp_vec, missed_bracs);
+        }
+
+        if missed_bracs > 0 {
+            println!(
+                "{} {}",
+                "⚠︎ Warning!".yellow(),
+                "Brackets were not all matched.",
+            )
+        }
+
+        let mut l_ind = 0;
+        let mut r_ind = inp_vec.len() - 1;
+
+        // In Brackets Crop
+
+        for (ind, c) in inp_vec.iter().enumerate() {
+            if misc::is_string_lbrac((*c).clone()) {
+                l_ind = ind;
+            } else if misc::is_string_rbrac((*c).clone()) {
+                r_ind = ind;
+                brac_found = true;
+                break;
+            }
+        }
+
+        // Operation
+        inp_vec = simplify(inp_vec, l_ind, r_ind, &mut op_vec, &cur_modes);
+
+        op_vec.push(inp_vec.clone());
+
+        // Get rid of the extra brackets around
+        // NOTE: dont rely on r_ind as it will be different from the true one at this point
+        if brac_found == true {
+            let mut inp_vec_temp = inp_vec[..l_ind].to_vec();
+            inp_vec_temp.extend(vec![inp_vec[l_ind + 1].clone()]);
+            inp_vec_temp.extend(inp_vec[l_ind + 3..].to_vec());
+            inp_vec = inp_vec_temp;
+            op_vec.push(inp_vec.clone());
+        }
+
+        // break;
+        // println!("@main while inp_vec{:?}", inp_vec);
+
+        if inp_vec.len() <= 1 {
+            output_obtained = true;
+        }
+    }
+    return op_vec;
+}
+
 fn operation_one_operand(oper_vec: Vec<String>) -> Vec<String> {
     let mut temp_vec = oper_vec.clone();
     let mut ind = 0;
@@ -964,6 +1058,37 @@ fn operation_one_operand(oper_vec: Vec<String>) -> Vec<String> {
         ind = ind + 1;
     }
     return temp_vec;
+}
+
+fn remove_surr_bracs(inp: String) -> String {
+    let mut new_inp = inp.replace("[", "[ ");
+    new_inp = new_inp.replace("]", " ] ");
+    new_inp = new_inp.replace("{", " { ");
+    new_inp = new_inp.replace("}", " } ");
+    new_inp = new_inp.replace("(", " ( ");
+    new_inp = new_inp.replace(")", " ) ");
+
+    let mut inp_vec: Vec<String> = new_inp.split(' ').map(|s| s.to_string()).collect();
+
+    let mut ind = 0;
+    while ind < inp_vec.len() {
+        if inp_vec[ind] == "" {
+            inp_vec.remove(ind);
+            continue;
+        }
+        ind = ind + 1;
+    }
+
+    if is_string_lbrac(inp_vec[0].clone()) && is_string_rbrac(inp_vec[inp_vec.len() - 1].clone()) {
+        let test = inp_vec[1..inp_vec.len() - 1].join("");
+        if unequal_brac(inp_vec.clone(), 0).1 == 0 {
+            return test;
+        } else {
+            return inp_vec.join("");
+        }
+    } else {
+        inp_vec.join("")
+    }
 }
 
 struct Modes {
@@ -1233,107 +1358,204 @@ fn main() {
             println!("{}", "Aliasing is on!".green());
         }
         //-- --
-        let mut op_vec: Vec<Vec<Vec<String>>> = vec![vec![]];
 
         // Separate each exps in input in a vector
-        for (inp_ind, mut inp) in input.split('=').map(|s| s.to_string()).enumerate() {
-            inp = format_inp(inp);
-
-            let mut inp_vec = misc::create_vecs_from_str(inp, " ");
-            // println!("@main inp_vec{:?}", inp_vec);
-            // -- --
-            let mut output_obtained = false;
-
-            while !output_obtained {
-                // Brackets Autocomplete
-                // -- --
-                let mut brac_found: bool = false;
-                let mut missed_bracs = 0;
-                let mut inp_vec_prev: Vec<String> = vec![];
-                while inp_vec_prev != inp_vec {
-                    inp_vec_prev = inp_vec.clone();
-                    (inp_vec, missed_bracs) = unequal_brac(inp_vec, missed_bracs);
-                }
-
-                if missed_bracs > 0 {
-                    println!(
-                        "{} {}",
-                        "⚠︎ Warning!".yellow(),
-                        "Brackets were not all matched.",
-                    )
-                }
-
-                let mut l_ind = 0;
-                let mut r_ind = inp_vec.len() - 1;
-
-                // In Brackets Crop
-
-                for (ind, c) in inp_vec.iter().enumerate() {
-                    if misc::is_string_lbrac((*c).clone()) {
-                        l_ind = ind;
-                    } else if misc::is_string_rbrac((*c).clone()) {
-                        r_ind = ind;
-                        brac_found = true;
-                        break;
-                    }
-                }
-
-                // Get output vector ready
-                //
-                while op_vec.len() < inp_ind + 1 {
-                    op_vec.push(vec![]);
-                }
-
-                // Operation
-                inp_vec = simplify(inp_vec, l_ind, r_ind, &mut op_vec[inp_ind], &cur_modes);
-
-                op_vec[inp_ind].push(inp_vec.clone());
-
-                // Get rid of the extra brackets around
-                // NOTE: dont rely on r_ind as it will be different from the true one at this point
-                if brac_found == true {
-                    let mut inp_vec_temp = inp_vec[..l_ind].to_vec();
-                    inp_vec_temp.extend(vec![inp_vec[l_ind + 1].clone()]);
-                    inp_vec_temp.extend(inp_vec[l_ind + 3..].to_vec());
-                    inp_vec = inp_vec_temp;
-                    op_vec[inp_ind].push(inp_vec.clone());
-                }
-
-                // break;
-                // println!("@main while inp_vec{:?}", inp_vec);
-
-                if inp_vec.len() <= 1 {
-                    output_obtained = true;
-                }
-            }
+        let mut handside: Vec<Vec<Vec<String>>> = vec![];
+        for (ind, inp) in input.split('=').map(|s| s.to_string()).enumerate() {
+            handside.push(brac_handler(inp, &cur_modes));
+            handside[ind].remove(0);
         }
 
         let mut max_len = 0;
         let mut max_len_ind = 0;
-        let no_of_hands = op_vec.len();
-        for (op_ind, _) in op_vec.clone().into_iter().enumerate() {
-            if max_len < op_vec[op_ind].len() {
-                max_len = op_vec[op_ind].len();
+        let no_of_hands = handside.len();
+
+        for (op_ind, _) in handside.clone().into_iter().enumerate() {
+            if max_len < handside[op_ind].len() {
+                max_len = handside[op_ind].len();
                 max_len_ind = op_ind;
             }
         }
         for l in 0..no_of_hands {
-            for _ in op_vec[l].len()..max_len {
-                let last_el = op_vec[l][op_vec[l].len() - 1].clone();
-                op_vec[l].push(last_el);
+            for _ in handside[l].len()..max_len {
+                let last_el = handside[l][handside[l].len() - 1].clone();
+                handside[l].push(last_el);
             }
         }
 
-        let mut temp_op_vec = op_vec[max_len_ind].clone();
+        if no_of_hands == 2 {
+            let mut rhs = handside[1][handside[1].len() - 1][0].clone();
+            let mut lhs = handside[0][handside[0].len() - 1][0].clone();
+            let mut rhs_op_hei = misc::operations_heirarchy(rhs.clone());
+            let mut lhs_op_hei = misc::operations_heirarchy(lhs.clone());
+            // get the poly part
+            let x_side: String;
+            let val_side: String;
+
+            if rhs.contains('x') && !lhs.contains('x') {
+                x_side = rhs.clone();
+                val_side = "lhs".to_string();
+            } else if lhs.contains('x') && !rhs.contains('x') {
+                x_side = lhs.clone();
+                val_side = "rhs".to_string();
+            } else if rhs.contains('x') && lhs.contains('x') {
+                if lhs.contains("/") {
+                    x_side = rhs.clone();
+                    val_side = "lhs".to_string();
+                } else if rhs.contains("/") {
+                    x_side = lhs.clone();
+                    val_side = "rhs".to_string();
+                } else {
+                    x_side = lhs.clone();
+                    val_side = "rhs".to_string();
+                }
+            } else {
+                x_side = lhs.clone();
+                val_side = "rhs".to_string();
+            }
+            let mut value;
+
+            let re_higher_order = Regex::new(r"x[2-9]+").unwrap();
+
+            if !re_higher_order.is_match(&x_side) && !x_side.contains("/") {
+                if rhs == x_side {
+                    let rhs_sum_const = rhs
+                        .split('+')
+                        .filter(|x| !x.contains('x'))
+                        .collect::<Vec<&str>>()[0]
+                        .to_string();
+                    lhs = poly_addition(
+                        lhs.clone(),
+                        poly_multiplication(rhs_sum_const.clone(), "-1".to_string()),
+                    );
+                    rhs = poly_addition(
+                        rhs,
+                        poly_multiplication(rhs_sum_const.clone(), "-1".to_string()),
+                    );
+                    let rhs_coef = rhs.replace("x", "");
+                    rhs = poly_division(rhs, rhs_coef.clone());
+                    lhs = poly_division(lhs, rhs_coef.clone());
+                }
+                if lhs == x_side {
+                    let lhs_sum_const = lhs
+                        .split('+')
+                        .filter(|x| !x.contains('x'))
+                        .collect::<Vec<&str>>()[0]
+                        .to_string();
+                    lhs = poly_addition(
+                        lhs,
+                        poly_multiplication(lhs_sum_const.clone(), "-1".to_string()),
+                    );
+                    rhs = poly_addition(
+                        rhs.clone(),
+                        poly_multiplication(lhs_sum_const.clone(), "-1".to_string()),
+                    );
+                    let lhs_coef = lhs.replace("x", "");
+                    rhs = poly_division(rhs, lhs_coef.clone());
+                    lhs = poly_division(lhs, lhs_coef.clone());
+                }
+
+                handside[1].push(vec![rhs]);
+                handside[0].push(vec![lhs]);
+            } else {
+                if val_side == "lhs" {
+                    value = lhs.clone();
+                } else {
+                    value = rhs.clone();
+                }
+
+                while !misc::is_string_numeric(value) {
+                    // println!("t lhs_op_hei: {:?}, lhs: {}", lhs_op_hei, lhs);
+                    // println!("t rhs_op_hei: {:?}, rhs: {}", rhs_op_hei, rhs);
+                    if lhs_op_hei.len() > 0 {
+                        if lhs_op_hei[0].1 == "/" {
+                            let lhs_prods = lhs.split('/').collect::<Vec<&str>>();
+                            let lhs_denom = remove_surr_bracs(lhs_prods[1].to_string());
+
+                            rhs = poly_multiplication(rhs, lhs_denom);
+                            lhs = lhs_prods[0].to_string();
+                            lhs_op_hei.remove(0);
+                        } else if lhs_op_hei[0].1 == "+" && rhs == x_side {
+                            let lhs_summer = lhs.split('+').collect::<Vec<&str>>();
+                            rhs = poly_addition(
+                                rhs,
+                                poly_multiplication(lhs_summer[0].to_string(), "-1".to_string()),
+                            );
+                            lhs = lhs_summer[1..].join("+").to_string();
+                            lhs_op_hei.remove(0);
+                        }
+                    }
+                    if rhs_op_hei.len() > 0 {
+                        if rhs_op_hei[0].1 == "/" {
+                            let rhs_prods = rhs.split('/').collect::<Vec<&str>>();
+                            let rhs_denom = remove_surr_bracs(rhs_prods[1].to_string());
+
+                            lhs = poly_multiplication(lhs, rhs_denom);
+                            rhs = rhs_prods[0].to_string();
+                            rhs_op_hei.remove(0);
+                        } else if rhs_op_hei[0].1 == "+" && lhs == x_side {
+                            let rhs_summer = rhs.split('+').collect::<Vec<&str>>();
+                            lhs = poly_addition(
+                                lhs,
+                                poly_multiplication(rhs_summer[0].to_string(), "-1".to_string()),
+                            );
+                            rhs = rhs_summer[1..].join("+").to_string();
+                            rhs_op_hei.remove(0);
+                        }
+                    }
+                    // println!("m lhs_op_hei: {:?}, lhs: {}", lhs_op_hei, lhs);
+                    // println!("m rhs_op_hei: {:?}, rhs: {}", rhs_op_hei, rhs);
+
+                    if val_side == "lhs" {
+                        value = remove_surr_bracs(lhs.clone());
+                    } else {
+                        value = remove_surr_bracs(rhs.clone());
+                    }
+                    // println!("b lhs_op_hei: {:?}, lhs: {}", lhs_op_hei, lhs);
+                    // println!("b rhs_op_hei: {:?}, rhs: {}", rhs_op_hei, rhs);
+                }
+                handside[1].push(vec![rhs.clone()]);
+                handside[0].push(vec![lhs.clone()]);
+
+                if val_side == "lhs" {
+                    value = remove_surr_bracs(lhs.clone());
+                    lhs = poly_addition(
+                        remove_surr_bracs(lhs.clone()),
+                        poly_multiplication(value.clone(), "-1".to_string()),
+                    );
+                    rhs = poly_addition(
+                        remove_surr_bracs(rhs.clone()),
+                        poly_multiplication(value.clone(), "-1".to_string()),
+                    );
+                } else {
+                    value = remove_surr_bracs(rhs.clone());
+                    lhs = poly_addition(
+                        remove_surr_bracs(lhs.clone()),
+                        poly_multiplication(value.clone(), "-1".to_string()),
+                    );
+                    rhs = poly_addition(
+                        remove_surr_bracs(rhs.clone()),
+                        poly_multiplication(value.clone(), "-1".to_string()),
+                    );
+                }
+                handside[1].push(vec![rhs.clone()]);
+                handside[0].push(vec![lhs.clone()]);
+            }
+        }
+
+        // To combine each hands
+        let mut temp_op_vec = handside[max_len_ind].clone();
         for hand in 0..no_of_hands {
             if hand != max_len_ind {
-                for k in 0..op_vec[hand].len() {
-                    let mut temp_op_val = op_vec[hand][k].clone();
+                for k in 0..handside[hand].len() {
+                    let mut temp_op_val = handside[hand][k].clone();
                     temp_op_val.insert(0, " = ".to_string());
                     temp_op_vec[k].extend(temp_op_val);
                 }
             }
         }
+
+        // To print the op
         format_out(&mut temp_op_vec);
         // -- --
     }

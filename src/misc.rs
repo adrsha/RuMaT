@@ -1,3 +1,4 @@
+use crate::format_inp;
 use crate::OPERATORS;
 use num_complex::Complex;
 use regex::Regex;
@@ -159,4 +160,44 @@ pub fn factorial(n: i32) -> i32 {
         fact = fact * i;
     }
     return fact;
+}
+
+pub fn operations_heirarchy(inp: String) -> Vec<(i32, String)> {
+    let mut brac_stack: Vec<usize> = vec![0];
+    let new_inp = format_inp(inp.clone()).trim().to_string();
+
+    let mut operations: Vec<(i32, String)> = vec![];
+    let mut new_vec: Vec<String> = new_inp.split(' ').map(|s| s.to_string()).collect();
+
+    let mut ind = 0;
+    let mut el;
+    while ind < new_vec.len() {
+        el = new_vec[ind].clone();
+        if is_string_lbrac(el.to_string()) {
+            brac_stack.push(ind);
+        } else if is_string_rbrac(el.to_string()) {
+            // Remove the elements in check_string from new_vec
+            let check_string = new_vec.clone();
+            let check_string = check_string[brac_stack[brac_stack.len() - 1]..=ind].into_iter();
+            for _ in 0..check_string.len() {
+                new_vec.remove(brac_stack[brac_stack.len() - 1]);
+            }
+            ind = ind - check_string.len();
+            brac_stack.pop();
+            for c in check_string {
+                if is_string_operator(c.clone()) || c == "-" {
+                    operations.push((brac_stack.len() as i32, c.to_string()));
+                }
+            }
+        }
+        ind = ind + 1;
+    }
+    for el in new_vec {
+        if is_string_operator(el.to_string()) || el == "-" {
+            operations.push((0, el.to_string()));
+        }
+    }
+
+    operations.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    operations
 }

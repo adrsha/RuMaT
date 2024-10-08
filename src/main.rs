@@ -1094,7 +1094,6 @@ fn remove_surr_bracs(inp: String) -> String {
 struct Modes {
     rad: bool,
     alias: bool,
-    eqn: bool,
 }
 
 impl Modes {
@@ -1139,7 +1138,6 @@ fn main() {
     let mut cur_modes = Modes {
         rad: false,
         alias: false,
-        eqn: false,
     };
     let cur_aliases = Alias {
         value: "".to_string(),
@@ -1298,14 +1296,12 @@ fn main() {
 
                 let mut rad_mode = cur_modes.mode_status("Radian Mode", cur_modes.rad);
                 let mut alias_mode = cur_modes.mode_status("Alias Input", cur_modes.alias);
-                let mut eqn_mode = cur_modes.mode_status("Equation Solver", cur_modes.eqn);
 
                 println!(
                     "{}\n\n1. {} \n2. {} \n3. {} \n\n{}",
                     title,
                     rad_mode,
                     alias_mode,
-                    eqn_mode,
                     "Choose respective number to toggle:".green()
                 );
 
@@ -1337,10 +1333,6 @@ fn main() {
                     cur_modes.alias = !cur_modes.alias;
                     alias_mode = cur_modes.mode_status("Alias Input", cur_modes.alias);
                     println!("{}\n ", alias_mode);
-                } else if mode_inp == "3" {
-                    cur_modes.eqn = !cur_modes.eqn;
-                    eqn_mode = cur_modes.mode_status("Equation Solver", cur_modes.eqn);
-                    println!("{}\n ", eqn_mode);
                 } else if mode_inp == "q" {
                     close_modes = true;
                     continue;

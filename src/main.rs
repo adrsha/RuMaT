@@ -1094,6 +1094,7 @@ fn remove_surr_bracs(inp: String) -> String {
 struct Modes {
     rad: bool,
     alias: bool,
+    eqn: bool,
 }
 
 impl Modes {
@@ -1138,6 +1139,7 @@ fn main() {
     let mut cur_modes = Modes {
         rad: false,
         alias: false,
+        eqn: false,
     };
     let cur_aliases = Alias {
         value: "".to_string(),
@@ -1296,12 +1298,14 @@ fn main() {
 
                 let mut rad_mode = cur_modes.mode_status("Radian Mode", cur_modes.rad);
                 let mut alias_mode = cur_modes.mode_status("Alias Input", cur_modes.alias);
+                let mut eqn_mode = cur_modes.mode_status("Equation Solver", cur_modes.eqn);
 
                 println!(
                     "{}\n\n1. {} \n2. {} \n3. {} \n\n{}",
                     title,
                     rad_mode,
                     alias_mode,
+                    eqn_mode,
                     "Choose respective number to toggle:".green()
                 );
 
@@ -1333,6 +1337,10 @@ fn main() {
                     cur_modes.alias = !cur_modes.alias;
                     alias_mode = cur_modes.mode_status("Alias Input", cur_modes.alias);
                     println!("{}\n ", alias_mode);
+                } else if mode_inp == "3" {
+                    cur_modes.eqn = !cur_modes.eqn;
+                    eqn_mode = cur_modes.mode_status("Equation Solver", cur_modes.eqn);
+                    println!("{}\n ", eqn_mode);
                 } else if mode_inp == "q" {
                     close_modes = true;
                     continue;
@@ -1424,7 +1432,10 @@ fn main() {
                         rhs,
                         poly_multiplication(rhs_sum_const.clone(), "-1".to_string()),
                     );
-                    let rhs_coef = rhs.replace("x", "");
+                    let mut rhs_coef = rhs.replace("x", "");
+                    if rhs_coef == "" {
+                        rhs_coef = "1.0".to_string();
+                    }
                     rhs = poly_division(rhs, rhs_coef.clone());
                     lhs = poly_division(lhs, rhs_coef.clone());
                 }
@@ -1442,7 +1453,10 @@ fn main() {
                         rhs.clone(),
                         poly_multiplication(lhs_sum_const.clone(), "-1".to_string()),
                     );
-                    let lhs_coef = lhs.replace("x", "");
+                    let mut lhs_coef = lhs.replace("x", "");
+                    if lhs_coef == "" {
+                        lhs_coef = "1.0".to_string();
+                    }
                     rhs = poly_division(rhs, lhs_coef.clone());
                     lhs = poly_division(lhs, lhs_coef.clone());
                 }
@@ -1457,8 +1471,8 @@ fn main() {
                 }
 
                 while !misc::is_string_numeric(value) {
-                    // println!("t lhs_op_hei: {:?}, lhs: {}", lhs_op_hei, lhs);
-                    // println!("t rhs_op_hei: {:?}, rhs: {}", rhs_op_hei, rhs);
+                    println!("t lhs_op_hei: {:?}, lhs: {}", lhs_op_hei, lhs);
+                    println!("t rhs_op_hei: {:?}, rhs: {}", rhs_op_hei, rhs);
                     if lhs_op_hei.len() > 0 {
                         if lhs_op_hei[0].1 == "/" {
                             let lhs_prods = lhs.split('/').collect::<Vec<&str>>();
@@ -1495,16 +1509,16 @@ fn main() {
                             rhs_op_hei.remove(0);
                         }
                     }
-                    // println!("m lhs_op_hei: {:?}, lhs: {}", lhs_op_hei, lhs);
-                    // println!("m rhs_op_hei: {:?}, rhs: {}", rhs_op_hei, rhs);
+                    println!("m lhs_op_hei: {:?}, lhs: {}", lhs_op_hei, lhs);
+                    println!("m rhs_op_hei: {:?}, rhs: {}", rhs_op_hei, rhs);
 
                     if val_side == "lhs" {
                         value = remove_surr_bracs(lhs.clone());
                     } else {
                         value = remove_surr_bracs(rhs.clone());
                     }
-                    // println!("b lhs_op_hei: {:?}, lhs: {}", lhs_op_hei, lhs);
-                    // println!("b rhs_op_hei: {:?}, rhs: {}", rhs_op_hei, rhs);
+                    println!("b lhs_op_hei: {:?}, lhs: {}", lhs_op_hei, lhs);
+                    println!("b rhs_op_hei: {:?}, rhs: {}", rhs_op_hei, rhs);
                 }
                 handside[1].push(vec![rhs.clone()]);
                 handside[0].push(vec![lhs.clone()]);

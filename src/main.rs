@@ -1220,7 +1220,7 @@ fn main() {
 
     vec_alias.dedup();
 
-    println!("{}", "SHARK Calculator ".magenta());
+    println!("{}", "RuMaT ".magenta());
     let mut history_path = my_home().unwrap().unwrap();
     history_path.push(".history.txt");
     let history_path = history_path.into_os_string().into_string().unwrap();

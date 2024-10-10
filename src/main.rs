@@ -1255,7 +1255,7 @@ fn main() {
             .expect("Could not store in history.txt");
 
         if input == "h".to_string() || input == "help".to_string() {
-            let title = "SHARK:".blue();
+            let title = "RuMaT:".blue();
 
             let help_page = "HELP PAGE (h)".green();
             let features = vec![

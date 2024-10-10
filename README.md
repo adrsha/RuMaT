@@ -1,4 +1,4 @@
-# SHARK Calculator Documentation
+# Rust Mathematical Toolset Documentation
 
 ## NOTE:
 I am a student currently working on this project, so the code is not yet fully optimized and may contain bugs.
@@ -6,7 +6,7 @@ This application is still majorly under development, so please report any bugs y
 
 ## Overview
 
-The **SHARK Calculator** is a Rust-based calculator that supports complex numbers, trigonometric functions, equation solving, and an aliasing system for faster input. It automatically completes brackets and shows step-by-step calculations.
+**Rumat** is a Rust-based toolset that supports complex numbers, trigonometric functions, equation solving, and an aliasing system for faster input. It automatically completes brackets and shows step-by-step calculations.
 
 ## Features
 
@@ -65,4 +65,4 @@ The **SHARK Calculator** is a Rust-based calculator that supports complex number
 
 --- 
 
-This documentation provides the basic functionality and usage instructions for the SHARK Calculator.
+This documentation provides the basic functionality and usage instructions for RuMaT.
